@@ -10,6 +10,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -231,6 +232,10 @@ var cookieStore = sessions.NewCookieStore([]byte(os.Getenv("COOKIE_SECRET")))
 
 func protect(action http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if baseURL.Scheme == "https" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		}
+
 		sess := getSession(r)
 		var authorized bool
 		if sess.Values["user"] != nil {
@@ -327,6 +332,7 @@ var (
 	s3Bucket   = s3.New(aws.Auth{os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY")}, aws.USEast).Bucket(os.Getenv("S3_BUCKET"))
 	authUsers  = strings.Split(os.Getenv("AUTHORIZED_USERS"), ",")
 	githubAuth *oauth2.OAuth2Service
+	baseURL    *url.URL
 )
 
 func init() {
@@ -336,6 +342,14 @@ func init() {
 			log.Fatalf("Missing %s environment variable", env)
 		}
 	}
+
+	var err error
+	baseURL, err = url.Parse(os.Getenv("BASE_URL"))
+	if err != nil {
+		log.Fatal("Invalid BASE_URL:", err)
+	}
+
 	githubAuth = oauth2.Service(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), "https://github.com/login/oauth/authorize", "https://github.com/login/oauth/access_token")
-	githubAuth.RedirectURL = os.Getenv("BASE_URL") + "/auth/return"
+	ret, _ := url.Parse("/auth/return")
+	githubAuth.RedirectURL = baseURL.ResolveReference(ret).String()
 }
