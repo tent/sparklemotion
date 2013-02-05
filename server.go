@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -11,8 +14,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	"bitbucket.org/gosimple/oauth2"
+	"github.com/gorilla/sessions"
 	"github.com/russross/blackfriday"
 	"github.com/titanous/go.xml"
 	"github.com/titanous/sparklemotion/appcast"
@@ -221,9 +227,94 @@ func internalError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
+var cookieStore = sessions.NewCookieStore([]byte(os.Getenv("COOKIE_SECRET")))
+
+func protect(action http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sess := getSession(r)
+		var authorized bool
+		if sess.Values["user"] != nil {
+			for _, u := range authUsers {
+				if sess.Values["user"].(string) == u {
+					authorized = true
+					break
+				}
+			}
+		} else {
+			http.Redirect(w, r, "/auth", http.StatusFound)
+			return
+		}
+
+		if authorized {
+			action(w, r)
+		} else {
+			http.Error(w, "You're not allowed here!", http.StatusForbidden)
+		}
+	}
+}
+
+func randString(bytes int) string {
+	b := make([]byte, bytes)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func getSession(r *http.Request) *sessions.Session {
+	s, _ := cookieStore.Get(r, "sparklemotion")
+	return s
+}
+
+var authSetupHandler = func(w http.ResponseWriter, r *http.Request) {
+	state := randString(8)
+	sess := getSession(r)
+	sess.Values["state"] = state
+	sess.Save(r, w)
+	http.Redirect(w, r, githubAuth.GetAuthorizeURL(state), http.StatusFound)
+}
+
+type githubUser struct {
+	Login string `json:"login"`
+}
+
+var authFinalizeHandler = func(w http.ResponseWriter, r *http.Request) {
+	sess := getSession(r)
+	if sess.Values["state"] == nil || r.FormValue("state") != sess.Values["state"].(string) {
+		http.Error(w, "Invalid session state", http.StatusBadRequest)
+	}
+	delete(sess.Values, "state")
+
+	token, err := githubAuth.GetAccessToken(r.FormValue("code"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	github := oauth2.Request("https://api.github.com/", token.AccessToken)
+	github.AccessTokenInHeader = true
+	github.AccessTokenInHeaderScheme = "token"
+	userInfo, err := github.Get("user")
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	defer userInfo.Body.Close()
+	user := &githubUser{}
+	err = json.NewDecoder(userInfo.Body).Decode(user)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+
+	sess.Values["user"] = user.Login
+	sess.Save(r, w)
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
 func main() {
-	http.HandleFunc("/", indexHandler)
-	http.HandleFunc("/push", pushHandler)
+	http.HandleFunc("/", protect(indexHandler))
+	http.HandleFunc("/push", protect(pushHandler))
+	http.HandleFunc("/auth", authSetupHandler)
+	http.HandleFunc("/auth/return", authFinalizeHandler)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -232,14 +323,19 @@ func main() {
 }
 
 var (
-	appName  = os.Getenv("APP_NAME")
-	s3Bucket = s3.New(aws.Auth{os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY")}, aws.USEast).Bucket(os.Getenv("S3_BUCKET"))
+	appName    = os.Getenv("APP_NAME")
+	s3Bucket   = s3.New(aws.Auth{os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY")}, aws.USEast).Bucket(os.Getenv("S3_BUCKET"))
+	authUsers  = strings.Split(os.Getenv("AUTHORIZED_USERS"), ",")
+	githubAuth *oauth2.OAuth2Service
 )
 
 func init() {
-	for _, env := range []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "APP_NAME", "S3_BUCKET"} {
+	e := []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "APP_NAME", "S3_BUCKET", "COOKIE_SECRET", "AUTHORIZED_USERS", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "BASE_URL"}
+	for _, env := range e {
 		if os.Getenv(env) == "" {
 			log.Fatalf("Missing %s environment variable", env)
 		}
 	}
+	githubAuth = oauth2.Service(os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"), "https://github.com/login/oauth/authorize", "https://github.com/login/oauth/access_token")
+	githubAuth.RedirectURL = os.Getenv("BASE_URL") + "/auth/return"
 }
