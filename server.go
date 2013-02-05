@@ -190,7 +190,14 @@ func updateAppcast(item *appcast.Item, channel string) error {
 		defer current.Close()
 	}
 
-	feed := &appcast.RSS{Version: "2.0", Channel: &appcast.Channel{Title: appName, Description: appName, Link: s3Bucket.URL(filename)}}
+	feed := &appcast.RSS{
+		Version: "2.0",
+		Channel: &appcast.Channel{
+			Title:       appName,
+			Description: fmt.Sprintf("Updates for %s (%s)", appName, channel),
+			Link:        s3Bucket.URL(filename),
+		},
+	}
 	if current != nil {
 		err = xml.NewDecoder(current).Decode(feed)
 		if err != nil {
