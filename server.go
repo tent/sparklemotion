@@ -186,9 +186,6 @@ func updateAppcast(item *appcast.Item, channel string) error {
 			return err
 		}
 	}
-	if current != nil {
-		defer current.Close()
-	}
 
 	feed := &appcast.RSS{
 		Version: "2.0",
@@ -199,6 +196,7 @@ func updateAppcast(item *appcast.Item, channel string) error {
 		},
 	}
 	if current != nil {
+		defer current.Close()
 		err = xml.NewDecoder(current).Decode(feed)
 		if err != nil {
 			return err
