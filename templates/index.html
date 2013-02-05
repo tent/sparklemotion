@@ -2,7 +2,7 @@
 
 {{ define "content" }}
 <h1><i class="icon-star-empty"></i><sub class="icon-star"></sub>Sparkle Motion<sub class="icon-star-empty"></sub><i class="icon-star"></i></h1>
-<form action="/push inline">
+<form action="/push" method="post">
   <label class="radio inline">
     <input type="radio" name="channel" value="alpha" checked>
     Alpha
@@ -16,13 +16,15 @@
     Stable
   </label>
   <label>Version</label>
-  <input type="text" class="input-mini" name="version" placeholder="2.0">
+  <input type="text" class="input-mini" name="version" placeholder="2.0" required>
   <label>Title</label>
-  <input type="text" class="input-xxlarge" name="title" placeholder="Version 2.0 (2 bugs fixed; 3 new features)">
+  <input type="text" class="input-xxlarge" name="title" placeholder="Version 2.0 (2 bugs fixed; 3 new features)" required>
   <label>Release Notes (markdown)</label>
   <textarea name="notes" class="input-xxlarge" rows="10"></textarea>
-  <label>File</label>
-  <input type="file" class="input-xxlarge" name="file" accept=".dmg,.zip,.tar.gz,.tar.bz2">
+  <label>DSA Signature</label>
+  <input type="text" class="input-xxlarge" name="signature">
+  <label>App Archive (.dmg, .zip, .tar.gz, or .tar.bz2)</label>
+  <input type="file" class="input-xxlarge" name="file" accept=".dmg,.zip,.tar.gz,.tar.bz2" required>
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">PUSH!</button>
   </div>
