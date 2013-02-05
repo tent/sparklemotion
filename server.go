@@ -47,6 +47,7 @@ var (
 )
 
 var pushHandler = func(w http.ResponseWriter, r *http.Request) {
+	// Force all file parts to be written to disk so that we can get the size from the filesystem
 	err := r.ParseMultipartForm(0)
 	if err != nil {
 		internalError(w, err)
