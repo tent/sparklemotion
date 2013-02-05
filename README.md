@@ -3,10 +3,12 @@
 Sparkle Motion manages appcasts and application binaries in S3, making
 [Sparkle](http://sparkle.andymatuschak.org/) updates a dance in the park.
 
+![](https://s3.amazonaws.com/f.cl.ly/items/3L1Y1m0X2c1V323v1o0V/Screen%20Shot%202013-02-05%20at%202.22.44%20PM.png)
+
 ## Getting Started
 
 It is a tiny web application, so the easiest way to get started is to deploy
-Sparkle Motion to [Heroku](https://www.heroku.com/).
+to [Heroku](https://www.heroku.com/).
 
 ### S3
 
@@ -88,15 +90,15 @@ channel.
 
 ### URLs
 
-**Alpha Appcast**: `https://s3.amazonaws.com/BUCKET/APP_NAME-alpha.xml`
+**Alpha Appcast**: `https://s3.amazonaws.com/BUCKET/APPNAME-alpha.xml`
 
-**Beta Appcast**: `https://s3.amazonaws.com/BUCKET/APP_NAME-beta.xml`
+**Beta Appcast**: `https://s3.amazonaws.com/BUCKET/APPNAME-beta.xml`
 
-**Stable Appcast**: `https://s3.amazonaws.com/BUCKET/APP_NAME-beta.xml`
+**Stable Appcast**: `https://s3.amazonaws.com/BUCKET/APPNAME-stable.xml`
 
-**Application Release**: `https://s3.amazonaws.com/BUCKET/APP_NAME-VERSION.EXT`
+**Application Release**: `https://s3.amazonaws.com/BUCKET/APPNAME-VERSION.EXT`
 
-**Release Notes**: `https://s3.amazonaws.com/BUCKET/APP_NAME-VERSION.html`
+**Release Notes**: `https://s3.amazonaws.com/BUCKET/APPNAME-VERSION.html`
 
 :sparkles: :dizzy: :dancer: :star2:
 
