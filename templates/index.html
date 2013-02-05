@@ -1,5 +1,30 @@
-{{ define "title" }}SparkleMotion{{ end }}
+{{ define "title" }}Sparkle Motion{{ end }}
 
 {{ define "content" }}
-<h1>Hello, world!</h1>
+<h1><i class="icon-star-empty"></i><sub class="icon-star"></sub>Sparkle Motion<sub class="icon-star-empty"></sub><i class="icon-star"></i></h1>
+<form action="/push inline">
+  <label class="radio inline">
+    <input type="radio" name="channel" value="alpha" checked>
+    Alpha
+  </label>
+  <label class="radio inline">
+    <input type="radio" name="channel" value="beta" checked>
+    Beta
+  </label>
+  <label class="radio inline">
+    <input type="radio" name="channel" value="stable" checked>
+    Stable
+  </label>
+  <label>Version</label>
+  <input type="text" class="input-mini" name="version" placeholder="2.0">
+  <label>Title</label>
+  <input type="text" class="input-xxlarge" name="title" placeholder="Version 2.0 (2 bugs fixed; 3 new features)">
+  <label>Release Notes (markdown)</label>
+  <textarea name="notes" class="input-xxlarge" rows="10"></textarea>
+  <label>File</label>
+  <input type="file" class="input-xxlarge" name="file" accept=".dmg,.zip,.tar.gz,.tar.bz2">
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">PUSH!</button>
+  </div>
+</form>
 {{ end }}

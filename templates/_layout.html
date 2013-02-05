@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html>
-	<head>
-        <meta charset="utf-8">
-		<title>{{ template "title" . }}</title>
-	</head>
-	<body>
-		{{ template "content" . }}
-	</body>
+  <head>
+    <meta charset="utf-8">
+    <title>{{ template "title" . }}</title>
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.2.2/css/bootstrap-combined.min.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="span12">
+      {{ template "content" . }}
+    </div>
+  </body>
 </html>
