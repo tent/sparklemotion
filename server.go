@@ -27,11 +27,15 @@ import (
 	"launchpad.net/goamz/s3"
 )
 
+type indexInfo struct {
+	RequireSignature bool
+}
+
 var indexTemplate = template.Must(template.ParseFiles("templates/_layout.html", "templates/index.html"))
 
 var indexHandler = func(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	err := indexTemplate.Execute(w, nil)
+	err := indexTemplate.Execute(w, &indexInfo{requireSig})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -63,6 +67,10 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 	if title == "" {
 		http.Error(w, "Missing title", http.StatusBadRequest)
+		return
+	}
+	if requireSig && signature == "" {
+		http.Error(w, "Missing signature", http.StatusBadRequest)
 		return
 	}
 	if signature != "" && !signaturePattern.MatchString(signature) {
@@ -335,6 +343,7 @@ var (
 	appName    = os.Getenv("APP_NAME")
 	s3Bucket   = s3.New(aws.Auth{os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY")}, aws.USEast).Bucket(os.Getenv("S3_BUCKET"))
 	authUsers  = strings.Split(os.Getenv("AUTHORIZED_USERS"), ",")
+	requireSig = os.Getenv("REQUIRE_SIGNATURE") != ""
 	githubAuth *oauth2.OAuth2Service
 	baseURL    *url.URL
 )
