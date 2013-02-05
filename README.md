@@ -7,8 +7,8 @@ Sparkle Motion manages appcasts and application binaries in S3, making
 
 ## Getting Started
 
-It is a tiny web application, so the easiest way to get started is to deploy
-to [Heroku](https://www.heroku.com/).
+Sparkle Motion is a tiny web application, so the easiest way to get started is
+to deploy to [Heroku](https://www.heroku.com/).
 
 ### S3
 
