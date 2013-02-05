@@ -234,6 +234,10 @@ func protect(action http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if baseURL.Scheme == "https" {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+			if r.Header.Get("X-Forwarded-Proto") != "https" {
+				http.Redirect(w, r, baseURL.ResolveReference(r.URL).String(), http.StatusMovedPermanently)
+				return
+			}
 		}
 
 		sess := getSession(r)
