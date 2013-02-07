@@ -87,6 +87,11 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html")
+	// Push 2KB down the wire so that Chrome starts partial rendering of our streaming response
+	fmt.Fprint(w, strings.Repeat(" ", 2048))
+	writeStatus(w, "Uploading binary to S3...")
+
 	fstat, err := f.(*os.File).Stat()
 	if err != nil {
 		internalError(w, err)
@@ -101,6 +106,7 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 
 	var notesURL string
 	if notes != "" {
+		writeStatus(w, "Uploading release notes...")
 		notesURL, err = uploadReleaseNotes(notes, version)
 		if err != nil {
 			internalError(w, err)
@@ -130,6 +136,7 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 
 	switch channel {
 	case "stable":
+		writeStatus(w, "Updating stable appcast...")
 		err = updateAppcast(item, "stable")
 		if err != nil {
 			internalError(w, err)
@@ -138,6 +145,7 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 		}
 		fallthrough
 	case "beta":
+		writeStatus(w, "Updating beta appcast...")
 		err = updateAppcast(item, "beta")
 		if err != nil {
 			internalError(w, err)
@@ -146,6 +154,7 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 		}
 		fallthrough
 	case "alpha":
+		writeStatus(w, "Updating alpha appcast...")
 		err = updateAppcast(item, "alpha")
 		if err != nil {
 			internalError(w, err)
@@ -154,7 +163,7 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fmt.Fprintf(w, "BOOM!")
+	writeStatus(w, "BOOM!")
 }
 
 func uploadFile(f multipart.File, fh *multipart.FileHeader, version string, length int64) (url string, err error) {
@@ -230,6 +239,13 @@ func updateAppcast(item *appcast.Item, channel string) error {
 	}
 
 	return s3Bucket.Put(filename, newFeed, "text/xml; charset=utf-8", s3.PublicRead)
+}
+
+func writeStatus(w http.ResponseWriter, msg string) {
+	fmt.Fprintf(w, "<p>%s</p>", msg)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func internalError(w http.ResponseWriter, err error) {
