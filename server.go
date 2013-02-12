@@ -22,9 +22,9 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/russross/blackfriday"
 	"github.com/titanous/go.xml"
+	"github.com/titanous/goamz/aws"
+	"github.com/titanous/goamz/s3"
 	"github.com/titanous/sparklemotion/appcast"
-	"launchpad.net/goamz/aws"
-	"launchpad.net/goamz/s3"
 )
 
 type indexInfo struct {
@@ -143,6 +143,12 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 			return
 			// TODO: cleanup uploaded file
 		}
+		writeStatus(w, "Updating latest redirect...")
+		err = updateLatestRedirect("stable", fileURL)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
 		fallthrough
 	case "beta":
 		writeStatus(w, "Updating beta appcast...")
@@ -152,6 +158,12 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 			return
 			// TODO: cleanup uploaded file
 		}
+		writeStatus(w, "Updating latest redirect...")
+		err = updateLatestRedirect("beta", fileURL)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
 		fallthrough
 	case "alpha":
 		writeStatus(w, "Updating alpha appcast...")
@@ -160,6 +172,12 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 			internalError(w, err)
 			return
 			// TODO: cleanup uploaded file
+		}
+		writeStatus(w, "Updating latest redirect...")
+		err = updateLatestRedirect("alpha", fileURL)
+		if err != nil {
+			internalError(w, err)
+			return
 		}
 	}
 
@@ -239,6 +257,16 @@ func updateAppcast(item *appcast.Item, channel string) error {
 	}
 
 	return s3Bucket.Put(filename, newFeed, "text/xml; charset=utf-8", s3.PublicRead)
+}
+
+func updateLatestRedirect(channel, url string) error {
+	headers := map[string][]string{
+		"Content-Length":                  {"0"},
+		"Content-Type":                    {"text/html"},
+		"x-amz-acl":                       {string(s3.PublicRead)},
+		"x-amz-website-redirect-location": {url},
+	}
+	return s3Bucket.PutWithHeaders(appName+"-"+channel, strings.NewReader(""), headers)
 }
 
 func writeStatus(w http.ResponseWriter, msg string) {
