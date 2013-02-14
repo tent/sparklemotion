@@ -1,14 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,13 +31,25 @@ import (
 
 type indexInfo struct {
 	RequireSignature bool
+
+	Version    string
+	FileURL    string
+	FileLength string
+	Signature  string
 }
 
 var indexTemplate = template.Must(template.ParseFiles("templates/_layout.html", "templates/index.html"))
 
 var indexHandler = func(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	err := indexTemplate.Execute(w, &indexInfo{requireSig})
+	err := indexTemplate.Execute(w, &indexInfo{
+		RequireSignature: requireSig,
+
+		Version:    r.FormValue("version"),
+		FileURL:    r.FormValue("url"),
+		FileLength: r.FormValue("length"),
+		Signature:  r.FormValue("signature"),
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -45,6 +59,72 @@ var (
 	versionPattern   = regexp.MustCompile(`[0-9]\.[0-9]\w*`)
 	signaturePattern = regexp.MustCompile(`[A-Za-z0-9/+]+=*`)
 )
+
+var uploadHandler = func(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	if subtle.ConstantTimeCompare(apiKey, []byte(query.Get("key"))) != 1 {
+		http.Error(w, "Incorrect or missing key", http.StatusUnauthorized)
+		return
+	}
+	length, _ := strconv.ParseInt(query.Get("length"), 10, 64)
+	if length == 0 {
+		http.Error(w, "Missing or invalid length param", http.StatusBadRequest)
+		return
+	}
+
+	multi, err := r.MultipartReader()
+	if err != nil {
+		http.Error(w, "Invalid multipart body", http.StatusBadRequest)
+		return
+	}
+
+	var version, url string
+	for {
+		part, err := multi.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			http.Error(w, "Invalid multipart body", http.StatusBadRequest)
+			return
+		}
+
+		name := part.FormName()
+		if name == "" {
+			continue
+		}
+		filename := part.FileName()
+		if filename != "" && version == "" {
+			http.Error(w, "Version must be before file in multipart body", http.StatusBadRequest)
+			return
+		}
+
+		if name == "version" {
+			b := &bytes.Buffer{}
+			_, err := b.ReadFrom(part)
+			if err != nil {
+				http.Error(w, "Error reading version part", http.StatusInternalServerError)
+				return
+			}
+
+			version = b.String()
+			if !versionPattern.MatchString(version) {
+				http.Error(w, "Invalid version number", http.StatusBadRequest)
+				return
+			}
+		}
+
+		if filename != "" {
+			url, err = uploadFile(part, filename, version, length)
+			if err != nil {
+				internalError(w, err)
+				return
+			}
+			break
+		}
+	}
+	w.Write([]byte(url))
+}
 
 var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 	// Force all file parts to be written to disk so that we can get the size from the filesystem
@@ -58,6 +138,8 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 	version := r.FormValue("version")
 	title := r.FormValue("title")
 	notes := r.FormValue("notes")
+	fileURL := r.FormValue("url")
+	fileLength := r.FormValue("length")
 	if channel != "alpha" && channel != "beta" && channel != "stable" {
 		http.Error(w, "Invalid release channel", http.StatusBadRequest)
 		return
@@ -76,32 +158,42 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 	if signature != "" && !signaturePattern.MatchString(signature) {
 		http.Error(w, "Invalid DSA signature", http.StatusBadRequest)
-	}
-	f, fh, err := r.FormFile("file")
-	if err == http.ErrMissingFile {
-		http.Error(w, "Missing file", http.StatusBadRequest)
 		return
 	}
-	if err != nil {
-		internalError(w, err)
+	length, _ := strconv.ParseInt(fileLength, 10, 64)
+	if fileURL != "" && length == 0 {
+		http.Error(w, "Invalid file length", http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html")
 	// Push 2KB down the wire so that Chrome starts partial rendering of our streaming response
 	fmt.Fprint(w, strings.Repeat(" ", 2048))
-	writeStatus(w, "Uploading binary to S3...")
 
-	fstat, err := f.(*os.File).Stat()
-	if err != nil {
-		internalError(w, err)
-	}
-	length := fstat.Size()
-	fileURL, err := uploadFile(f, fh, version, length)
-	f.Close()
-	if err != nil {
-		internalError(w, err)
-		return
+	if fileURL == "" {
+		f, fh, err := r.FormFile("file")
+		if err == http.ErrMissingFile {
+			http.Error(w, "Missing file", http.StatusBadRequest)
+			return
+		}
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+
+		writeStatus(w, "Uploading binary to S3...")
+
+		fstat, err := f.(*os.File).Stat()
+		if err != nil {
+			internalError(w, err)
+		}
+		length = fstat.Size()
+		fileURL, err = uploadFile(f, fh.Filename, version, length)
+		f.Close()
+		if err != nil {
+			internalError(w, err)
+			return
+		}
 	}
 
 	var notesURL string
@@ -184,8 +276,8 @@ var pushHandler = func(w http.ResponseWriter, r *http.Request) {
 	writeStatus(w, "BOOM!")
 }
 
-func uploadFile(f multipart.File, fh *multipart.FileHeader, version string, length int64) (url string, err error) {
-	ext := filepath.Ext(fh.Filename)
+func uploadFile(f io.Reader, name string, version string, length int64) (url string, err error) {
+	ext := filepath.Ext(name)
 	filename := appName + "-" + version + ext
 
 	// Check if the file already exists
@@ -330,6 +422,7 @@ var authSetupHandler = func(w http.ResponseWriter, r *http.Request) {
 	state := randString(8)
 	sess := getSession(r)
 	sess.Values["state"] = state
+	sess.Values["return"] = r.URL.String()
 	sess.Save(r, w)
 	http.Redirect(w, r, githubAuth.GetAuthorizeURL(state), http.StatusFound)
 }
@@ -367,14 +460,20 @@ var authFinalizeHandler = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	url := sess.Values["return"]
+	if url == nil {
+		url = "/"
+	}
+	delete(sess.Values, "return")
 	sess.Values["user"] = user.Login
 	sess.Save(r, w)
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, url.(string), http.StatusFound)
 }
 
 func main() {
 	http.HandleFunc("/", protect(indexHandler))
 	http.HandleFunc("/push", protect(pushHandler))
+	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/auth", authSetupHandler)
 	http.HandleFunc("/auth/return", authFinalizeHandler)
 	port := os.Getenv("PORT")
@@ -388,13 +487,14 @@ var (
 	appName    = os.Getenv("APP_NAME")
 	s3Bucket   = s3.New(aws.Auth{os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY")}, aws.USEast).Bucket(os.Getenv("S3_BUCKET"))
 	authUsers  = strings.Split(os.Getenv("AUTHORIZED_USERS"), ",")
+	apiKey     = []byte(os.Getenv("API_KEY"))
 	requireSig = os.Getenv("REQUIRE_SIGNATURE") != ""
 	githubAuth *oauth2.OAuth2Service
 	baseURL    *url.URL
 )
 
 func init() {
-	e := []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "APP_NAME", "S3_BUCKET", "COOKIE_SECRET", "AUTHORIZED_USERS", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "BASE_URL"}
+	e := []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "APP_NAME", "S3_BUCKET", "COOKIE_SECRET", "AUTHORIZED_USERS", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "BASE_URL", "API_KEY"}
 	for _, env := range e {
 		if os.Getenv(env) == "" {
 			log.Fatalf("Missing %s environment variable", env)

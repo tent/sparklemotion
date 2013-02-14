@@ -15,18 +15,31 @@
     <input type="radio" name="channel" value="stable">
     Stable
   </label>
+  {{ if .Version }}
+  <input type="hidden" name="version" value="{{ .Version }}">
+  {{ else }}
   <label>Version</label>
-  <input type="text" class="input-mini" name="version" placeholder="2.0" required>
+  <input type="text" class="input-mini" name="version" placeholder="2.0" {{ if .Version }}value="{{ .Version }}" disabled{{ end }} required>
+  {{ end }}
   <label>Title</label>
-  <input type="text" class="input-xxlarge" name="title" placeholder="Version 2.0 (2 bugs fixed; 3 new features)" required>
+  <input type="text" class="input-xxlarge" name="title" placeholder="Version 2.0 (2 bugs fixed; 3 new features)" {{ if .Version }}value="Version {{ .Version }}"{{ end }} required>
   <label>Release Notes (markdown)</label>
   <textarea name="notes" class="input-xxlarge" rows="10"></textarea>
   {{ if .RequireSignature }}
+  {{ if .Signature }}
+  <input type="hidden" name="signature" value="{{ .Signature }}">
+  {{ else }}
   <label>DSA Signature</label>
-  <input type="text" class="input-xxlarge" name="signature" required>
+  <input type="text" class="input-xxlarge" name="signature" {{ if .Signature }}value="{{ .Signature }}" disabled{{ end }} required>
   {{ end }}
+  {{ end }}
+  {{ if .FileURL }}
+  <input type="hidden" name="url" value="{{ .FileURL }}">
+  <input type="hidden" name="length" value="{{ .FileLength }}">
+  {{ else }}
   <label>App Archive (.dmg, .zip, .tar.gz, or .tar.bz2)</label>
   <input type="file" class="input-xxlarge" name="file" accept=".dmg,.zip,.tar.gz,.tar.bz2" required>
+  {{ end }}
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">PUSH!</button>
   </div>

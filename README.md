@@ -72,6 +72,7 @@ heroku config:add \
   BASE_URL=<the Heroku app URL> \
   AUTHORIZED_USERS=<comma separated GitHub usernames> \
   REQUIRE_SIGNATURE=1 # remove this line if you sign apps with a certificate from Apple \
+  API_KEY=$(openssl rand -hex 16 | tr -d '\r\n')
   COOKIE_SECRET=$(openssl rand -hex 16 | tr -d '\r\n')
 ```
 
