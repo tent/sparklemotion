@@ -89,6 +89,10 @@ Pushing to the `stable` channel will also push to the `beta` and `alpha`
 channels, and pushing to the `beta` channel will also push to the `alpha`
 channel.
 
+### Xcode Integration
+
+There is a [release script](examples/release.sh) that can be used to automatically upload and sign releases.
+
 ### URLs
 
 **Alpha Appcast**: `https://s3.amazonaws.com/BUCKET/APPNAME-alpha.xml`
