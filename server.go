@@ -40,7 +40,7 @@ type indexInfo struct {
 
 var indexTemplate = template.Must(template.ParseFiles("templates/_layout.html", "templates/index.html"))
 
-var indexHandler = func(w http.ResponseWriter, r *http.Request) {
+func indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	err := indexTemplate.Execute(w, &indexInfo{
 		RequireSignature: requireSig,
@@ -60,7 +60,7 @@ var (
 	signaturePattern = regexp.MustCompile(`[A-Za-z0-9/+]+=*`)
 )
 
-var uploadHandler = func(w http.ResponseWriter, r *http.Request) {
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if subtle.ConstantTimeCompare(apiKey, []byte(query.Get("key"))) != 1 {
 		http.Error(w, "Incorrect or missing key", http.StatusUnauthorized)
@@ -126,7 +126,7 @@ var uploadHandler = func(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(url))
 }
 
-var pushHandler = func(w http.ResponseWriter, r *http.Request) {
+func pushHandler(w http.ResponseWriter, r *http.Request) {
 	// Force all file parts to be written to disk so that we can get the size from the filesystem
 	err := r.ParseMultipartForm(0)
 	if err != nil {
@@ -418,7 +418,7 @@ func getSession(r *http.Request) *sessions.Session {
 	return s
 }
 
-var authSetupHandler = func(w http.ResponseWriter, r *http.Request) {
+func authSetupHandler(w http.ResponseWriter, r *http.Request) {
 	state := randString(8)
 	sess := getSession(r)
 	sess.Values["state"] = state
@@ -431,7 +431,7 @@ type githubUser struct {
 	Login string `json:"login"`
 }
 
-var authFinalizeHandler = func(w http.ResponseWriter, r *http.Request) {
+func authFinalizeHandler(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
 	if sess.Values["state"] == nil || r.FormValue("state") != sess.Values["state"].(string) {
 		http.Error(w, "Invalid session state", http.StatusBadRequest)
