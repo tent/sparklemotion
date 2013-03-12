@@ -395,6 +395,8 @@ func protect(action http.HandlerFunc) http.HandlerFunc {
 				}
 			}
 		} else {
+			sess.Values["return"] = r.URL.String()
+			sess.Save(r, w)
 			http.Redirect(w, r, "/auth", http.StatusFound)
 			return
 		}
@@ -422,7 +424,6 @@ func authSetupHandler(w http.ResponseWriter, r *http.Request) {
 	state := randString(8)
 	sess := getSession(r)
 	sess.Values["state"] = state
-	sess.Values["return"] = r.URL.String()
 	sess.Save(r, w)
 	http.Redirect(w, r, githubAuth.GetAuthorizeURL(state), http.StatusFound)
 }
