@@ -47,8 +47,9 @@ zip -qr "$zip" "$FULL_PRODUCT_NAME"
 
 sig=$(ruby "$PROJECT_DIR/vendor/Sparkle/sign_update.rb" "$zip" "$PROJECT_DIR/config/dsa_priv.pem")
 length=$(stat -f%z "$zip")
+md5=$(openssl dgst -md5 -binary "$zip" | openssl enc -base64)
 
-url=$(curl -F "version=$version" -F "file=@$zip" "$smurl/upload?key=$smkey&length=$length")
+url=$(curl -F "version=$version" -F "file=@$zip" -H "Content-MD5: $md5" "$smurl/upload?key=$smkey&length=$length")
 url="${url?}" # strip trailing newline
 
 if [[ $url != http* ]]; then

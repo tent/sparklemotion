@@ -115,7 +115,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if filename != "" {
-			url, err = uploadFile(part, filename, version, length)
+			url, err = uploadFile(part, filename, version, length, r.Header.Get("Content-MD5"))
 			if err != nil {
 				internalError(w, err)
 				return
@@ -188,7 +188,7 @@ func pushHandler(w http.ResponseWriter, r *http.Request) {
 			internalError(w, err)
 		}
 		length = fstat.Size()
-		fileURL, err = uploadFile(f, fh.Filename, version, length)
+		fileURL, err = uploadFile(f, fh.Filename, version, length, "")
 		f.Close()
 		if err != nil {
 			internalError(w, err)
@@ -276,7 +276,7 @@ func pushHandler(w http.ResponseWriter, r *http.Request) {
 	writeStatus(w, "BOOM!")
 }
 
-func uploadFile(f io.Reader, name string, version string, length int64) (url string, err error) {
+func uploadFile(f io.Reader, name string, version string, length int64, md5 string) (url string, err error) {
 	ext := filepath.Ext(name)
 	filename := appName + "-" + version + ext
 
@@ -298,7 +298,16 @@ func uploadFile(f io.Reader, name string, version string, length int64) (url str
 		return "", errors.New("App version already exists")
 	}
 
-	err = s3Bucket.PutReader(filename, f, length, "application/octet-stream", s3.PublicRead)
+	headers := map[string][]string{
+		"Content-Length": {strconv.FormatInt(length, 10)},
+		"Content-Type":   {"application/octet-stream"},
+		"x-amz-acl":      {string(s3.PublicRead)},
+	}
+	if md5 != "" {
+		headers["Content-MD5"] = []string{md5}
+	}
+
+	err = s3Bucket.PutWithHeaders(filename, f, headers)
 	return s3Bucket.URL(filename), err
 }
 
