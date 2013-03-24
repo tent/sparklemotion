@@ -42,7 +42,7 @@ You will need a Heroku account and the [Heroku
 Toolbelt](https://toolbelt.heroku.com/) installed to deploy.
 
 ```
-git clone git://github.com/titanous/sparklemotion.git
+git clone git://github.com/cupcake/sparklemotion.git
 cd sparklemotion
 heroku create -b https://github.com/kr/heroku-buildpack-go.git
 ```

@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"bitbucket.org/gosimple/oauth2"
+	"github.com/cupcake/sparklemotion/appcast"
 	"github.com/gorilla/sessions"
 	"github.com/russross/blackfriday"
 	"github.com/titanous/go.xml"
 	"github.com/titanous/goamz/aws"
 	"github.com/titanous/goamz/s3"
-	"github.com/titanous/sparklemotion/appcast"
 )
 
 type indexInfo struct {
