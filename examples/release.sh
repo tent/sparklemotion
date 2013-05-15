@@ -4,8 +4,7 @@
 #
 # Add it as a "Run Script" phase at the end of your app target build.
 #
-# Copy your dsa_priv.pem to PROJECT_ROOT/config and create PROJECT_ROOT/config/release
-# with the url and key for your Sparkle Motion server:
+# Create PROJECT_ROOT/config/release with the url and key for your Sparkle Motion server:
 #
 # smurl=https://sparkle-motion-42.herokuapp.com
 # smkey=supersecret
@@ -42,10 +41,10 @@ zip="$PROJECT_DIR/release/$zipname"
 app="$CODESIGNING_FOLDER_PATH"
 
 cd "$app/.."
+codesign --resource-rules "$PROJECT_DIR/config/codesign_resources.plist" -s "Developer ID" "$FULL_PRODUCT_NAME"
 rm -f "$zip"
 zip -qr "$zip" "$FULL_PRODUCT_NAME"
 
-sig=$(ruby "$PROJECT_DIR/vendor/Sparkle/sign_update.rb" "$zip" "$PROJECT_DIR/config/dsa_priv.pem")
 length=$(stat -f%z "$zip")
 md5=$(openssl dgst -md5 -binary "$zip" | openssl enc -base64)
 
@@ -57,4 +56,4 @@ if [[ $url != http* ]]; then
   exit 1
 fi
 
-open "$smurl/?version=$version&length=$length&signature=$sig&url=$url"
+open "$smurl/?version=$version&length=$length&url=$url"
