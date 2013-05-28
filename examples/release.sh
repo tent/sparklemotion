@@ -41,7 +41,7 @@ zip="$PROJECT_DIR/release/$zipname"
 app="$CODESIGNING_FOLDER_PATH"
 
 cd "$app/.."
-codesign --resource-rules "$PROJECT_DIR/config/codesign_resources.plist" -s "Developer ID" "$FULL_PRODUCT_NAME"
+codesign -f --resource-rules "$PROJECT_DIR/config/codesign_resources.plist" -s "Developer ID" "$FULL_PRODUCT_NAME"
 rm -f "$zip"
 zip -qr "$zip" "$FULL_PRODUCT_NAME"
 
